@@ -54,6 +54,7 @@ class imageGetter:
                 images_outp.append(class_im)
 
                 if create_test:
+                    # Create easy to segment data as sanity check.
                     im_in = cv2.imread(im_out_path, cv2.IMREAD_GRAYSCALE)
                     _, im = cv2.threshold(im_in, 19, 1, cv2.THRESH_BINARY)
                     res_im = cv2.resize(im, (self.test_x,self.test_y))
@@ -62,7 +63,7 @@ class imageGetter:
                 else:
                     im_in_path = os.path.join(self.input_path, image_name)
                     im_in = cv2.imread(im_in_path,cv2.IMREAD_GRAYSCALE)
-                    im_in = cv2.resize(im, (self.test_x, self.test_y))
+                    im_in = cv2.resize(im_in, (self.test_x, self.test_y))
                 images_inp.append(im_in)
 
             # cv2.imshow('neg out', neg_im*250)

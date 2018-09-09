@@ -20,9 +20,10 @@ save_path =None
 use_sync_data = False
 
 if use_sync_data:
-    x_sz = y_sz = 101
+
+    x_sz = y_sz = 64
 else:
-    x_sz = y_sz = 101
+    x_sz = y_sz = 128
 
 imget = imageGetter(inp_path, out_path, x_sz , y_sz)
 autoEnc = CAE( x_sz , y_sz, save_path, on_home)

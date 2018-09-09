@@ -49,10 +49,10 @@ class CAE:
 
         inp = tf.reshape(inp_, shape=[-1,self.inp_sz,self.inp_sz,1])
         #----------------Encoder-----------------------------------#
-        kernel_1 = tf.Variable(tf.random_normal([9,9,1,16]))
-        kernel_1_2 = tf.Variable(tf.random_normal([9, 9, 16, 16]))
-        kernel_2 = tf.Variable(tf.random_normal([9, 9, 16, 32]))
-        kernel_2_2 = tf.Variable(tf.random_normal([9, 9, 32, 32]))
+        kernel_1 = tf.Variable(tf.random_normal([7,7, 1,16]))
+        kernel_1_2 = tf.Variable(tf.random_normal([3, 3, 16, 16]))
+        kernel_2 = tf.Variable(tf.random_normal([3, 3, 16, 32]))
+        kernel_2_2 = tf.Variable(tf.random_normal([3, 3, 32, 32]))
         kernel_3 = tf.Variable(tf.random_normal([3, 3, 32, 64]))
         kernel_3_2 = tf.Variable(tf.random_normal([3, 3, 64, 64]))
         kernel_fc = tf.Variable(tf.random_normal([1, 1, 64, 64]))
@@ -60,20 +60,20 @@ class CAE:
         stride_1 = [1,1,1,1]
         stride_2 = [1, 1]
 
-        encode_1 = tf.nn.conv2d(inp,kernel_1,[1,1,1,1],'VALID')
+        encode_1 = tf.nn.conv2d(inp,kernel_1,[1,1,1,1],'SAME')
         encode_1 = tf.nn.relu(encode_1)
         # layer_1 = tf.contrib.layers.batch_norm(layer_1, data_format='NHWC', center=True, scale=True,is_training=training)
         encode_1_2 = tf.nn.conv2d(encode_1, kernel_1_2, [1, 1, 1, 1], 'SAME')
         encode_1_2 = tf.nn.relu(encode_1_2)
-        encode_1_2 = tf.nn.max_pool(encode_1_2,ksize=[1,2,2,1], strides=[1,1,1,1], padding='SAME')
+        maxpool_encode_1_2 = tf.nn.max_pool(encode_1_2,ksize=[1,2,2,1], strides=[1,2,2,1], padding='SAME')
 
-        encode_2 = tf.nn.conv2d(encode_1_2, kernel_2, stride_1, 'VALID')
+        encode_2 = tf.nn.conv2d(maxpool_encode_1_2, kernel_2, stride_1, 'SAME')
         encode_2 = tf.nn.relu(encode_2)
         encode_2_2 = tf.nn.conv2d(encode_2, kernel_2_2, [1, 1, 1, 1], 'SAME')
         encode_2_2 = tf.nn.relu(encode_2_2)
-        encode_2_2= tf.nn.max_pool(encode_2_2,ksize=[1,2,2,1], strides=[1,2,2,1], padding='SAME')
+        maxpool_encode_2_2= tf.nn.max_pool(encode_2_2,ksize=[1,2,2,1], strides=[1,2,2,1], padding='SAME')
 
-        encode_3 = tf.nn.conv2d(encode_2_2, kernel_3, stride_1, 'VALID')
+        encode_3 = tf.nn.conv2d(maxpool_encode_2_2, kernel_3, stride_1, 'SAME')
         encode_3 = tf.nn.relu(encode_3)
         encode_3_2 = tf.nn.conv2d(encode_3, kernel_3_2, [1, 1, 1, 1], 'SAME')
         encode_3_2 = tf.nn.relu(encode_3_2)
@@ -83,27 +83,29 @@ class CAE:
         connected = tf.nn.conv2d( encoded_3_maxpool, kernel_fc,stride_1, 'SAME')
 
         print('encoded_3_maxpool ',encoded_3_maxpool.shape)
-        conc_enc = tf.concat((encoded_3_maxpool,connected),axis = 3)
 
         #----------------Decoder-----------------------------------#
-        decode_1 = tf.layers.conv2d_transpose(inputs=conc_enc, filters=32, kernel_size=3, strides=(2,2),padding='valid')
+        decode_1 = tf.layers.conv2d_transpose(inputs=connected, filters=64, kernel_size=3, strides=(2,2),padding='same')
         decode_1 = tf.nn.relu(decode_1)
-        decode_1_2 = tf.layers.conv2d(decode_1,32,3,(1,1),'same')
+        conc_decode_1 = tf.concat((encode_3_2, decode_1), axis=3)
+        decode_1_2 = tf.layers.conv2d(conc_decode_1,filters=64, kernel_size=3, strides =(1, 1), padding='same')
         decode_1_2 = tf.nn.tanh(decode_1_2)
         print('decode 1 ', decode_1)
 
-        conc_enc_2 = tf.concat((encode_2_2, decode_1_2), axis=3)
-        decode_2 = tf.layers.conv2d_transpose(inputs = conc_enc_2,   filters=16,kernel_size=9, strides=(2,2),padding='valid')
+        decode_2 = tf.layers.conv2d_transpose(inputs = decode_1_2,   filters=32,kernel_size=3, strides=(2,2),padding='same')
         print('decode 2 ',decode_2)
         decode_2 = tf.nn.relu(decode_2)
-        decode_2_2 = tf.layers.conv2d(decode_2, 16, 9, (1, 1), 'same')
+        conc_enc_2 = tf.concat((encode_2_2, decode_2), axis=3)
+        decode_2_2 = tf.layers.conv2d(conc_enc_2, filters=32, kernel_size=3, strides =(1, 1), padding='same')
         decode_2_2 = tf.nn.tanh(decode_2_2)
 
-        conc_enc_3 = tf.concat((encode_1_2, decode_2_2), axis=3)
-        decode_3 = tf.layers.conv2d_transpose(inputs=conc_enc_3, filters=9, kernel_size=9, strides=(1,1),padding='valid')
+        decode_3 = tf.layers.conv2d_transpose(inputs=decode_2_2, filters=16, kernel_size=3, strides=(2,2),padding='same')
         decode_3 = tf.nn.relu(decode_3)
-        decode_3_2 = tf.layers.conv2d(decode_3, 2, 9, (1, 1), 'same')
+        conc_enc_3 = tf.concat((encode_1_2, decode_3), axis=3)
+
+        decode_3_2 = tf.layers.conv2d(inputs =conc_enc_3, filters=2, kernel_size=7, strides =(1, 1), padding='same')
         print('decode_3_2 ', decode_3_2.shape)
+        # decode_3_2 =tf.nn.sigmoid(decode_3_2)
         output = tf.reshape(decode_3_2,shape=[-1,self.outp_sz,self.outp_sz,self.classes])
 
         return output
@@ -111,7 +113,19 @@ class CAE:
 
     def lossFunction(self, model):
 
-        self.cost = tf.nn.sigmoid_cross_entropy_with_logits(logits=model, labels = self.im_out)
+        sig_model = tf.nn.sigmoid(model)
+        sum_mat = tf.add(sig_model[:,:,:,0],self.im_out[:,:,:,0])
+        sum_mat = tf.Print(sum_mat, [sum_mat], 'sum_mat')
+
+        area_clipped = tf.clip_by_value(sum_mat,0,1.1)
+        area_union  = tf.reduce_sum(area_clipped)
+        area_overlap =  tf.reduce_sum((tf.multiply(sig_model[:,:,:,0], self.im_out[:,:,:,0])))
+        area_overlap = tf.Print(area_overlap, [area_overlap], 'area_overlap')
+
+        iou =(1 - area_overlap/area_union)*100
+
+        iou= tf.Print(iou,[iou], 'iou')
+        self.cost = tf.nn.sigmoid_cross_entropy_with_logits(logits=model, labels = self.im_out)+iou
         loss = tf.reduce_mean(self.cost)
         self.opim_func = tf.train.AdamOptimizer(self.lr).minimize(loss)
 
@@ -142,6 +156,8 @@ class CAE:
 
         input = np.array(data_in)
         input = np.reshape(input, [1,self.inp_sz,self.inp_sz])
+        cv2.imshow('data_in', data_in)
+        cv2.waitKey(20)
         out = self.sess.run(tf.nn.softmax(self.model),feed_dict={self.im_in:input})
 
         zeros = np.zeros(shape=[self.inp_sz, self.inp_sz, 1])
@@ -154,7 +170,7 @@ class CAE:
         # gray_scale_out = np.reshape(gray_scale_out,[self.inp_sz, self.inp_sz,self.classes])
         im_result = np.concatenate(( expected, result),axis=1)
         cv2.imshow('result ',im_result)
-        cv2.imshow('data_in',data_in)
+
         cv2.waitKey(100)
 
 
